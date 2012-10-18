@@ -1,0 +1,10 @@
+[
+    {
+        "id": "edit",
+        "children":
+        [
+            {"id": "wrap"},
+            { "command": "cssformat", "caption": "LP CSS Formatter V_1.2" }
+        ]
+    }
+]
