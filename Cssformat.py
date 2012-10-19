@@ -134,7 +134,7 @@ class CssformatCommand(sublime_plugin.TextCommand):
                                 except Exception, e:
                                     ind = -1
                             self.line += '$' + nextLine[0:len(nextLine) - 1] + '; }'
-
+                
                 while self.line.endswith('\n') or self.line.endswith('\r') or self.line.endswith('\r\n') or self.line.endswith(' '):
                     self.line = self.line[0:len(self.line)-1]           
                 
@@ -272,6 +272,7 @@ class CssformatCommand(sublime_plugin.TextCommand):
         def toMultipleLines():
             counter = 0
             nextText = ""
+            inMediaSection = False
             while counter < len(spacedLines):
                 line = spacedLines[counter]
 
@@ -287,6 +288,9 @@ class CssformatCommand(sublime_plugin.TextCommand):
 
                 if (not line.startswith('/*')) and openIndex > -1 and (closeIndex - openIndex) > 5:
                     declaration = line[0:openIndex + 1] + '\n'
+                    # check if the line is inside a media section
+                    if inMediaSection:
+                        declaration = '\t' + declaration
 
                     # remove the last semicolon
                     newLine = line[openIndex + 1:closeIndex]
@@ -366,7 +370,19 @@ class CssformatCommand(sublime_plugin.TextCommand):
 
                         multilineText.append(displayLine + '}\n')
                 else:
-                    multilineText.append(line)
+                    # check for lines starting with @
+                    if line.startswith('}'):
+                        inMediaSection = False
+
+                    if inMediaSection:
+                        line = '\t' + line
+                        multilineText.append(line)
+                    else:
+                        multilineText.append(line)
+
+                    if line.startswith('@'):
+                        inMediaSection = True
+                    
 
                 counter += 1
 
