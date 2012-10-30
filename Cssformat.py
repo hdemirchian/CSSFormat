@@ -30,6 +30,12 @@ class CssformatCommand(sublime_plugin.TextCommand):
             while counter < len(indentedLines):
                 self.line = indentedLines[counter]
 
+                #remove all strange characters from the begining of the line
+                # while self.line.startswith("\xef") or self.line.startswith("\xbb") or self.line.startswith("\xbf"):
+                #     self.line = self.line[1:len(self.line)]
+                while self.line[0] > '~':
+                    self.line = self.line[1:len(self.line)]
+
                 #remove spaces and tabs from the end of the line
                 while self.line.endswith(' ') or self.line.endswith('\t'):
                     self.line = self.line[0:len(self.line)-1]
