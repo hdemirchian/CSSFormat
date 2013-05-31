@@ -6,6 +6,12 @@ import sys
 class CssformatCommand(sublime_plugin.TextCommand):
     finalText = ""
     line = ""
+    isThereMarginSetting = False
+    isThereMarginSpecificSetting = False
+    isTherePaddingSetting = False
+    isTherePaddingSpecificSetting = False
+    lineDescriptor_M = ' '
+    lineDescriptor_P = ' '
 
     def run(self, edit):
         #sublime.status_message('Starting')
@@ -23,7 +29,7 @@ class CssformatCommand(sublime_plugin.TextCommand):
 
         def getTheLines():
             for line in file:
-                result.append(line)    
+                result.append(line)
 
         def flattenTheText():
             counter = 0
@@ -31,8 +37,6 @@ class CssformatCommand(sublime_plugin.TextCommand):
                 self.line = indentedLines[counter]
 
                 #remove all strange characters from the begining of the line
-                # while self.line.startswith("\xef") or self.line.startswith("\xbb") or self.line.startswith("\xbf"):
-                #     self.line = self.line[1:len(self.line)]
                 while self.line[0] > '~':
                     self.line = self.line[1:len(self.line)]
 
@@ -54,6 +58,7 @@ class CssformatCommand(sublime_plugin.TextCommand):
                         
                         #check for commented lines
                         if nextLine.startswith("/*") and (nextLine.endswith("*/") or nextLine.endswith("*/ ") or nextLine.endswith("*/  ")):
+                            print 'found a commented line ', nextLine
                             try:
                                 ind = nextLine.index(';')
                             except Exception, e:
@@ -65,8 +70,9 @@ class CssformatCommand(sublime_plugin.TextCommand):
                                 except Exception, e:
                                     ind = -1
                             self.line += '$' + nextLine + ';'
-                        else:
+                        else:                            
                             if nextLine.endswith('*/'):
+                                print 'found the end of commented line ', nextLine
                                 try:
                                     ind = nextLine.index(';')
                                 except Exception, e:
@@ -94,6 +100,7 @@ class CssformatCommand(sublime_plugin.TextCommand):
                                 nextLine = nextLine[0:len(nextLine) - 1]
                             #check for commented lines
                             if nextLine.startswith("/*") and (nextLine.endswith("*/") or nextLine.endswith("*/ ") or nextLine.endswith("*/  ")):
+                                print '@ a commented line ', nextLine
                                 try:
                                     ind = nextLine.index(';')
                                 except Exception, e:
@@ -107,6 +114,7 @@ class CssformatCommand(sublime_plugin.TextCommand):
                                 self.line += '$' + nextLine + ';'
                             else:
                                 if nextLine.endswith('*/'):
+                                    print '@ a line ending with a comment ', nextLine
                                     try:
                                         ind = nextLine.index(';')
                                     except Exception, e:
@@ -129,6 +137,7 @@ class CssformatCommand(sublime_plugin.TextCommand):
                         #  the last commented line
                         # print 'last line is: ', nextLine
                         if nextLine.startswith("/*"):
+                            print 'another commented line ', nextLine
                             try:
                                 ind = nextLine.index(';')
                             except Exception, e:
@@ -206,15 +215,84 @@ class CssformatCommand(sublime_plugin.TextCommand):
                 except Exception, e:
                     colonIndex = -1
                 if colonIndex > -1:
+                    if param[0:colonIndex] == 'margin':
+                        self.isThereMarginSetting = True
+                    if param.startswith('margin-'):
+                        self.isThereMarginSpecificSetting = True
+                    if param[0:colonIndex] == 'padding':
+                        self.isTherePaddingSetting = True
+                    if param.startswith('padding-'):
+                        self.isTherePaddingSpecificSetting = True
                     param = param[0:colonIndex] + ' ' + param[colonIndex + 1:len(param)]
                 newList.append(param + ';')
 
             #sort the list
             newList.sort()
 
-            # manage the special characters
+
             arraySize = len(newList)
+            # manage browser specific settings
+
+            nextHeader = ' '
+            currentHeader  = ' '
+            h = 0
+            missionComplete = False
+            while h < arraySize:
+                line = newList[h]
+                try:
+                    colonIndex = line.index(' ')
+                except Exception, e:
+                    colonIndex = -1
+                if colonIndex > -1:
+                    currentHeader = line[0:colonIndex]
+                    #now get the next header
+                    if arraySize > (h + 1):
+                        nextLineData = newList[h+1]
+                        try:
+                            newColonIndex = nextLineData.index(' ')
+                        except Exception, e:
+                            newColonIndex = -1
+                        if newColonIndex > -1:
+                            nextHeader = nextLineData[0:newColonIndex]
+                        if (currentHeader == nextHeader) and not missionComplete:
+                            #print 'nextHeader: ', nextHeader
+                            #print 'nextLineData: ', nextLineData
+                            # check if the data starts with a -
+                            data = line[colonIndex:len(line)]
+                            # remove the dang spaces
+                            while data.startswith(' '):
+                                data = data[1:len(data)]
+                            if data.startswith('-') or data.startswith('#') or data.startswith("linear-gradient"):
+                                if data.startswith("linear-gradient"):
+                                    missionComplete = True
+                                # go through the array and add it at the end of the matching parameters **************************************
+                                k = h + 1
+                                while (k < arraySize):
+                                    nextLineData = newList[k]
+                                    
+                                    try:
+                                        nextLineColonIndex = nextLineData.index(' ');
+                                    except Exception, e:
+                                        nextLineColonIndex = -1
+                                    nextLineHeader = nextLineData[0:nextLineColonIndex]
+
+                                    if nextLineHeader != currentHeader:
+                                        #print 'removing: ', line
+                                        #print 'inserting at:', k
+                                        newList.remove(line)
+                                        index = k - 1
+                                        newList.insert(index,line)
+                                        h = h - 1
+                                        k = 1000                                        
+                                    k += 1
+                            else:
+                               missionComplete = True 
+                    else:
+                        previousHeader = currentHeader
+                h += 1
+            # manage the special characters
             x = 0
+            arraySize = len(newList)
             while x < arraySize:
                 line = newList[x]
                 #start with placing colons back in
@@ -292,7 +370,7 @@ class CssformatCommand(sublime_plugin.TextCommand):
                 except Exception, e:
                     closeIndex = -1
 
-                if (not line.startswith('/*')) and openIndex > -1 and (closeIndex - openIndex) > 5:
+                if (not (line.startswith('/*') or line.startswith('\t/*') or line.startswith('\t\t/*') or line.startswith('\t\t\t/*') or line.startswith('\t\t\t\t/*') or line.startswith('\t\t\t\t\t/*') or line.startswith('\t\t\t\t\t\t/*') or line.startswith('\t\t\t\t\t\t\t/*'))) and openIndex > -1 and (closeIndex - openIndex) > 5:
                     declaration = line[0:openIndex + 1] + '\n'
                     # check if the line is inside a media section
                     if inMediaSection:
@@ -308,11 +386,20 @@ class CssformatCommand(sublime_plugin.TextCommand):
                     mainCounter = 0
                     startCounter = 0
                     listOfParams = []
+                    
                     while mainCounter < len(newLine):
-                        if newLine[mainCounter] == ';':
+                        if (newLine[mainCounter] == ';'):
                             # print 'Param ',paramCounter,' is: ', newLine[startCounter:mainCounter]
                             # print '-Starting char is: ',newLine[startCounter]
                             listOfParams.append(newLine[startCounter:mainCounter])
+                            mainCounter += 1
+                            startCounter = mainCounter
+                            paramCounter += 1
+
+                        if (mainCounter == len(newLine) - 1):
+                            temp = newLine[startCounter:mainCounter + 1]
+                            print 'new param is: ', temp
+                            listOfParams.append(temp)
                             mainCounter += 1
                             startCounter = mainCounter
                             paramCounter += 1
@@ -322,6 +409,15 @@ class CssformatCommand(sublime_plugin.TextCommand):
 
                     # Now, sort the list
                     listOfParams = sortThis(listOfParams)
+                    if self.isThereMarginSetting & self.isThereMarginSpecificSetting & (self.lineDescriptor_M == ' '):
+                        self.lineDescriptor_M = declaration
+                    else:                        
+                        if self.isTherePaddingSetting & self.isTherePaddingSpecificSetting & (self.lineDescriptor_P == ' '):
+                            self.lineDescriptor_P = declaration
+                    self.isThereMarginSetting = False
+                    self.isThereMarginSpecificSetting = False
+                    self.isTherePaddingSetting = False
+                    self.isTherePaddingSpecificSetting = False
 
                     if paramCounter > 3:
                         # get line's indentations
@@ -334,7 +430,7 @@ class CssformatCommand(sublime_plugin.TextCommand):
                         for param in listOfParams:
                             # fix lines with comments at the end
                             if param.endswith("*/;") and (not param.startswith("/*")):
-                                # print 'found a param that ends with a comment **************'
+                                print 'found a param that ends with a comment ', param
                                 
                                 #let's start by removing the ending semicolon
                                 param = param[0:len(param)-1]
@@ -392,25 +488,80 @@ class CssformatCommand(sublime_plugin.TextCommand):
 
                 counter += 1
 
-        getTheLines()
-        fixIndentations()
-        flattenTheText()
-        addSpaces()
-        toMultipleLines()
-        # print spacedLines
-        # print len(spacedLines)
-        # print '---------------------------------------'
-        # print multilineText
-        # print len(multilineText)
+        if sublime.ok_cancel_dialog('You need to save your file before formatting it.\nThe latest saved version will be formatted and you will loose your current changes.\n\nStart formatting?','START'):
+            getTheLines()
+            fixIndentations()
+            flattenTheText()
+            addSpaces()
+            toMultipleLines()
+            # print spacedLines
+            # print len(spacedLines)
+            # print '---------------------------------------'
+            # print multilineText
+            # print len(multilineText)
 
-        # target = curr_view.text_point(0, 0)
-        # self.view.show(target)
-        self.view.sel().clear()
-        fileSize = self.view.size()
+            # target = curr_view.text_point(0, 0)
+            # self.view.show(target)
+#            if self.lineDescriptor_M != ' ' or self.lineDescriptor_P != ' ':
+#                if self.lineDescriptor_M != ' ':
+#                    while self.lineDescriptor_M.startswith(' ') or self.lineDescriptor_M.startswith('\t'):
+#                        self.lineDescriptor_M = self.lineDescriptor_M[1:len(self.lineDescriptor_M)]
+#                    # try going to that line
+#                    lineNumber = 0
+#                    lineCounter = 0
+#                    while lineCounter < len(result):
+#                        line = result[lineCounter]
+#                        if line.find(str(self.lineDescriptor_M)) > -1:
+#                            lineNumber = lineCounter
+#                        lineCounter += 1
+#
+#                    # now, go to that line
+#                    pt = self.view.text_point(lineNumber, 0)
+#
+#                    self.view.sel().clear()
+#                    self.view.sel().add(sublime.Region(pt))
+#
+#                    self.view.show(pt)
+#
+#                    message = 'There is are multiple margin settings in section: -' + str(self.lineDescriptor_M) + '-\n\nPlease fix it and try formatting again.'
+#                    sublime.message_dialog(message)
+#                else:
+#                    while self.lineDescriptor_P.startswith(' ') or self.lineDescriptor_P.startswith('\t'):
+#                        self.lineDescriptor_P = self.lineDescriptor_P[1:len(self.lineDescriptor_P)]
+#                    # try going to that line
+#                    lineNumber = 0
+#                    lineCounter = 0
+#                    while lineCounter < len(result):
+#                        line = result[lineCounter]
+#                        if line.find(str(self.lineDescriptor_P)) > -1:
+#                            lineNumber = lineCounter
+#                        lineCounter += 1
+#
+#                    # now, go to that line
+#                    pt = self.view.text_point(lineNumber, 0)
+#
+#                    self.view.sel().clear()
+#                    self.view.sel().add(sublime.Region(pt))
+#
+#                    self.view.show(pt)
+#
+#                    message = 'There is are multiple padding settings in section: -' + str(self.lineDescriptor_P) + '-\n\nPlease fix it and try formatting again.'
+#                    sublime.message_dialog(message)
+#
+#            else:                
+            self.view.sel().clear()
+            fileSize = self.view.size()
 
-        self.view.erase(edit, sublime.Region(0, fileSize + 200))
-        
-        numLines = len(multilineText) - 1
-        while numLines > -1:
-            self.view.insert(edit, 0, multilineText[numLines])
-            numLines -= 1
+            self.view.erase(edit, sublime.Region(0, fileSize + 200))
+            
+            numLines = len(multilineText) - 1
+            while numLines > -1:
+                self.view.insert(edit, 0, multilineText[numLines])
+                numLines -= 1
+            sublime.message_dialog('CSSFormatter has successfully completed formatting of your file!')
+            self.isThereMarginSetting = False
+            self.isThereMarginSpecificSetting = False
+            self.isTherePaddingSetting = False
+            self.isTherePaddingSpecificSetting = False
+            self.lineDescriptor_M = ' '
+            self.lineDescriptor_P = ' '

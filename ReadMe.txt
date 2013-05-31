@@ -7,3 +7,6 @@ Here is the list of standards it follows:
 •	After sorting the parameters, all high priority parameters (parameters starting with ‘-’) should be moved to the top of the list and all low priority parameters (commented lines and parameters starting with ‘*’ and ‘_’) should be moved to the bottom of the list
 •	Statements containing less than 4 parameters should be displayed on one line
 •	Statements containing 4 or more parameters should be displayed in multiple lines.
+
+Updates:
+•	Fixed the bug of removing the last line if the selicolon was missing - sorry for taking so long to fix this.
